@@ -97,7 +97,7 @@
         <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-6">
             <div class="text-[10px] sm:text-xs text-gray-500">ID: <span id="sess-id"></span></div>
             <div class="text-green-500 font-bold text-xs sm:text-sm tracking-widest text-center mx-2">ПРОЕКТ «ЛАЙТ»</div>
-            <div class="text-[10px] sm:text-xs text-gray-500">v0.9.5_m</div>
+            <div class="text-[10px] sm:text-xs text-gray-500">v0.9.6_fix</div>
         </div>
 
         <div class="flex-grow flex flex-col items-center justify-center relative w-full h-full" id="level-content"></div>
@@ -173,7 +173,7 @@
                 let jumps = 0;
                 
                 const move = (e) => {
-                    if (jumps >= 5) return; // После 5 прыжков сдаемся ради мобилок
+                    if (jumps >= 5) return; 
                     jumps++;
                     if(e.type === 'touchstart') e.preventDefault(); 
                     b.style.left = (Math.random() * 70 + 15) + '%';
@@ -208,7 +208,6 @@
                     <div class="text-center mb-4 text-sm sm:text-base">Введите название канала:</div>
                     <input type="text" id="i3" class="terminal-input text-xl pb-1 mb-6" placeholder="_" autocomplete="off">
                     <button id="b3" class="btn-serious">Далее</button>
-                    <div class="text-[10px] text-gray-700 absolute bottom-0 w-full text-center">На телефоне клавиатура будет закрываться. Терпи.</div>
                 `;
                 const i = document.getElementById('i3');
                 const b = document.getElementById('b3');
@@ -252,7 +251,7 @@
                 document.getElementById('target5').onclick = next;
             },
 
-            // Уровень 6 (Адаптирован для мобилок)
+            // Уровень 6
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
@@ -270,7 +269,6 @@
                     v.innerText = r.value;
                 };
 
-                // Секретный хак для мобилок: двойной тап по цифре ставит 50
                 v.ondblclick = () => { r.value = 50; v.innerText = '50'; };
                 let lastTap = 0;
                 v.ontouchend = (e) => {
@@ -284,7 +282,7 @@
                 };
             },
 
-            // Уровень 7 (Адаптирован)
+            // Уровень 7
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
@@ -307,10 +305,9 @@
                 n.addEventListener('mouseenter', swap);
                 n.addEventListener('touchstart', swap, {passive: false});
                 
-                // На мобилке нажать "Нет" нельзя, жмем на знак вопроса
                 document.getElementById('q7').onclick = next;
                 y.onclick = fail;
-                n.onclick = next; // Для десктопа через Tab
+                n.onclick = next; 
             },
 
             // Уровень 8
@@ -355,7 +352,7 @@
                 document.getElementById('b9').onclick = fail;
             },
 
-            // Уровень 10 (Адаптирован зона нажатия)
+            // Уровень 10
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
@@ -369,7 +366,7 @@
                 document.getElementById('n10').onclick = next;
             },
 
-            // Уровень 11 (Принудительный селект)
+            // Уровень 11
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
@@ -422,7 +419,7 @@
                 };
             },
 
-            // Уровень 14 (Увеличено время появления)
+            // Уровень 14
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
@@ -448,7 +445,6 @@
                         b.style.opacity = '1';
                         b.style.pointerEvents = 'auto';
                         b.style.transform = 'scale(1)';
-                        // Кнопка висит дольше (800мс), чтобы с телефона успеть ткнуть
                         setTimeout(() => {
                             b.style.opacity = '0';
                             b.style.pointerEvents = 'none';
@@ -461,20 +457,26 @@
                 b.onclick = () => { clearInterval(intId); next(); };
             },
 
-            // Уровень 15 (Увеличен хитбокс)
+            // Уровень 15 (Исправлено!)
             function() {
                 const c = document.getElementById('level-content');
                 c.innerHTML = `
                     <div class="text-center mb-6 text-sm sm:text-base">Получение прав администратора.</div>
                     <button id="b15" class="btn-serious w-full py-6 sm:py-4 opacity-50 cursor-not-allowed text-lg" disabled>АВТОРИЗОВАТЬСЯ</button>
-                    <!-- На мобилке триггер больше (w-12 h-12), чтобы проще попасть пальцем в правый верхний угол -->
-                    <div id="hack15" class="absolute top-0 right-0 w-16 h-16 sm:w-4 sm:h-4 cursor-crosshair opacity-0"></div>
+                    
+                    <!-- Измененный триггер: теперь это зона 32x32px с микро-подсказкой в центре -->
+                    <div id="hack15" class="absolute top-2 right-2 w-16 h-16 sm:w-8 sm:h-8 cursor-crosshair flex items-center justify-center group">
+                        <div class="w-1 h-1 bg-red-900 opacity-30 group-hover:opacity-100 group-hover:animate-ping rounded-full transition-all"></div>
+                    </div>
+                    
+                    <div class="text-[10px] text-gray-700 absolute bottom-0 opacity-50">Присмотрись к углам.</div>
                 `;
                 document.getElementById('hack15').onclick = () => {
                     const b = document.getElementById('b15');
                     b.disabled = false;
                     b.classList.remove('opacity-50', 'cursor-not-allowed');
                     b.classList.add('!bg-green-700', 'animate-pulse');
+                    document.getElementById('hack15').style.display = 'none'; // Убираем триггер после нажатия
                 };
                 document.getElementById('b15').onclick = next;
             }
