@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система Доступа ЛАЙТ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e5e7eb;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            user-select: none; /* Запрещаем выделение текста по умолчанию */
+        }
+        
+        /* Трясущийся экран при ошибке */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .error-shake {
+            animation: shake 0.4s;
+            animation-iteration-count: 1;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 40px #ef4444 !important;
+        }
+
+        .glitch-bg {
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(255, 0, 0, 0.1),
+                rgba(255, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+        }
+
+        /* Кастомный, отвратительный скроллбар */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #4ade80;
+            color: #4ade80;
+            outline: none;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-serious {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+        .btn-serious:hover {
+            background: #374151;
+            border-color: #6b7280;
+        }
+
+        #final-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: black;
+            color: #dc2626;
+            font-size: 5vw;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: center;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-family: Arial, Helvetica, sans-serif;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen relative">
+
+    <div id="app-container" class="bg-gray-900 border border-gray-700 shadow-[0_0_20px_rgba(0,0,0,0.8)] rounded-md p-8 w-[600px] h-[400px] relative flex flex-col">
+        
+        <!-- Шапка -->
+        <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-6">
+            <div class="text-xs text-gray-500">SECURE_ID: <span id="sess-id"></span></div>
+            <div class="text-green-500 font-bold text-sm tracking-widest">ПРОЕКТ «ЛАЙТ»</div>
+            <div class="text-xs text-gray-500">v0.9.4_beta</div>
+        </div>
+
+        <!-- Контент уровня -->
+        <div class="flex-grow flex flex-col items-center justify-center relative" id="level-content">
+            <!-- Сюда инжектится дичь -->
+        </div>
+
+        <!-- Подвал -->
+        <div class="border-t border-gray-800 pt-2 mt-6 flex justify-between items-center text-xs text-gray-600">
+            <div id="step-counter">ШАГ: ИНИЦИАЛИЗАЦИЯ</div>
+            <div id="error-log" class="text-red-500 opacity-0 transition-opacity">НАРУШЕНИЕ ПРОТОКОЛА</div>
+        </div>
+    </div>
+
+    <!-- Финальный экран -->
+    <div id="final-screen">
+        Ты не прошла начинай заново
+    </div>
+
+    <script>
+        // Имитация 30 шагов
+        const stepLabels = [1, 3, 5, 8, 12, 15, 19, 22, 25, 27, 28, 29, 29.5, 29.9, 30];
+        let currentLevel = 0;
+        let globalIntervals = [];
+
+        // Утилита очистки
+        function clearLevel() {
+            globalIntervals.forEach(clearInterval);
+            globalIntervals = [];
+            const content = document.getElementById('level-content');
+            content.innerHTML = '';
+            content.className = 'flex-grow flex flex-col items-center justify-center relative w-full h-full';
+        }
+
+        // Рандомный ID
+        document.getElementById('sess-id').innerText = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        function fail() {
+            const app = document.getElementById('app-container');
+            const errLog = document.getElementById('error-log');
+            
+            app.classList.add('error-shake', 'glitch-bg');
+            errLog.style.opacity = '1';
+            
+            setTimeout(() => {
+                app.classList.remove('error-shake', 'glitch-bg');
+                errLog.style.opacity = '0';
+                currentLevel = 0;
+                renderLevel();
+            }, 600);
+        }
+
+        function next() {
+            currentLevel++;
+            if (currentLevel >= levels.length) {
+                win();
+            } else {
+                renderLevel();
+            }
+        }
+
+        function win() {
+            document.getElementById('app-container').style.display = 'none';
+            const fs = document.getElementById('final-screen');
+            fs.style.display = 'flex';
+            // Если кликнуть по финальному экрану - все по новой
+            fs.onclick = () => {
+                fs.style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                currentLevel = 0;
+                renderLevel();
+            };
+        }
+
+        // --- БАЗА УРОВНЕЙ (ШИЗОФРЕНИЯ НАЧИНАЕТСЯ ЗДЕСЬ) ---
+        const levels = [
+            // Уровень 1: Убегающая кнопка
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4">Подтвердите запуск системы администратора.</div>
+                    <div class="relative w-full h-32">
+                        <button id="b1" class="btn-serious absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">Принять</button>
+                    </div>
+                `;
+                const b = document.getElementById('b1');
+                b.onmouseover = () => {
+                    b.style.left = (Math.random() * 80 + 10) + '%';
+                    b.style.top = (Math.random() * 80 + 10) + '%';
+                };
+                b.onclick = next;
+            },
+
+            // Уровень 2: Алфавитный возраст
+            function() {
+                const c = document.getElementById('level-content');
+                // Массив 1-100, отсортированный как строки (1, 10, 100, 11...)
+                let opts = Array.from({length: 100}, (_, i) => i + 1).map(String).sort();
+                c.innerHTML = `
+                    <div class="text-center mb-4">Укажите ваш возраст (Доступ с 18 лет):</div>
+                    <select id="s2" class="bg-gray-800 text-white border border-gray-600 p-2 outline-none">
+                        ${opts.map(o => `<option value="${o}">${o}</option>`).join('')}
+                    </select>
+                    <button id="b2" class="btn-serious mt-8">Подтвердить</button>
+                `;
+                document.getElementById('b2').onclick = () => {
+                    if(document.getElementById('s2').value === '18') next(); else fail();
+                };
+            },
+
+            // Уровень 3: Перехват фокуса
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4">Введите название канала:</div>
+                    <input type="text" id="i3" class="terminal-input text-xl pb-1 mb-6" placeholder="_" autocomplete="off">
+                    <button id="b3" class="btn-serious">Далее</button>
+                `;
+                const i = document.getElementById('i3');
+                const b = document.getElementById('b3');
+                // Как только вводишь символ, фокус прыгает на кнопку "Далее"
+                i.onkeyup = () => { if(i.value.length > 0) b.focus(); };
+                b.onclick = () => {
+                    if(i.value.toLowerCase() === 'лайт') next(); else fail();
+                };
+            },
+
+            // Уровень 4: Чекбокс с деменцией
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-6 text-sm">Ознакомлен с правилами неразглашения:</div>
+                    <div class="flex items-center gap-2 mb-6">
+                        <input type="checkbox" id="c4" class="w-5 h-5 cursor-pointer">
+                        <label>Я согласен</label>
+                    </div>
+                    <button id="b4" class="btn-serious">Применить</button>
+                `;
+                const cb = document.getElementById('c4');
+                // Чекбокс сам снимается каждые 400мс
+                let intId = setInterval(() => { cb.checked = false; }, 400);
+                globalIntervals.push(intId);
+
+                document.getElementById('b4').onclick = () => {
+                    if(cb.checked) next(); else fail();
+                };
+            },
+
+            // Уровень 5: Фейк капча
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4 text-sm">Выберите все квадраты, где есть <span id="target5" class="underline cursor-pointer">светофор</span></div>
+                    <div class="grid grid-cols-3 gap-1 w-48 mb-4">
+                        ${[1,2,3,4,5,6,7,8,9].map(() => `<div class="w-16 h-16 bg-gray-700 hover:bg-gray-600 cursor-pointer fake-img"></div>`).join('')}
+                    </div>
+                    <button id="b5" class="btn-serious text-xs opacity-50">Пропустить</button>
+                `;
+                document.querySelectorAll('.fake-img').forEach(el => el.onclick = fail);
+                document.getElementById('b5').onclick = fail;
+                // Реальный триггер - само слово в тексте
+                document.getElementById('target5').onclick = next;
+            },
+
+            // Уровень 6: Магнитный слайдер
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4">Установите уровень допуска ровно на 50:</div>
+                    <input type="range" id="r6" min="0" max="100" value="0" class="w-full cursor-pointer">
+                    <div id="val6" class="mt-4 text-2xl font-bold text-green-500">0</div>
+                    <button id="b6" class="btn-serious mt-4">Зафиксировать</button>
+                `;
+                const r = document.getElementById('r6');
+                const v = document.getElementById('val6');
+                r.oninput = () => {
+                    let val = parseInt(r.value);
+                    // Не дает поставить 50 мышкой. Перепрыгивает.
+                    if (val === 50) r.value = Math.random() > 0.5 ? 49 : 51;
+                    v.innerText = r.value;
+                };
+                document.getElementById('b6').onclick = () => {
+                    // Пройти можно только если умудришься поставить 50 (например, стрелочками на клавиатуре)
+                    if(r.value == '50') next(); else fail();
+                };
+            },
+
+            // Уровень 7: Кнопки-предатели
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-8">Вы робот?</div>
+                    <div class="flex gap-4" id="btn-container">
+                        <button id="y7" class="btn-serious !bg-green-900 w-24">Да</button>
+                        <button id="n7" class="btn-serious !bg-red-900 w-24">Нет</button>
+                    </div>
+                `;
+                const n = document.getElementById('n7');
+                const y = document.getElementById('y7');
+                const container = document.getElementById('btn-container');
+                
+                n.onmouseover = () => {
+                    // Меняет кнопки местами при наведении на "Нет"
+                    if (container.children[0] === y) {
+                        container.appendChild(y);
+                    } else {
+                        container.appendChild(n);
+                    }
+                };
+                n.onclick = next; // Правильный ответ "Нет", но на него сложно нажать
+                y.onclick = fail;
+            },
+
+            // Уровень 8: Точный таймер
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4 text-sm">Остановите таймер в интервале 3.1 - 3.3 сек.</div>
+                    <div id="t8" class="text-4xl font-mono text-green-400 mb-6">0.00</div>
+                    <button id="b8" class="btn-serious w-40">СТАРТ</button>
+                `;
+                let startTime = 0;
+                let intId = null;
+                const b = document.getElementById('b8');
+                const t = document.getElementById('t8');
+
+                b.onclick = () => {
+                    if(!intId) {
+                        startTime = Date.now();
+                        b.innerText = "СТОП";
+                        intId = setInterval(() => {
+                            t.innerText = ((Date.now() - startTime) / 1000).toFixed(2);
+                        }, 10);
+                        globalIntervals.push(intId);
+                    } else {
+                        clearInterval(intId);
+                        let finalTime = (Date.now() - startTime) / 1000;
+                        if(finalTime >= 3.1 && finalTime <= 3.3) next(); else fail();
+                    }
+                };
+            },
+
+            // Уровень 9: Психологический тест
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-6">Нажмите зеленую кнопку.</div>
+                    <div class="flex gap-4">
+                        <button id="r9" class="btn-serious" style="background-color: #ef4444;">Зеленая</button>
+                        <button id="g9" class="btn-serious" style="background-color: #22c55e;">Красная</button>
+                        <button id="b9" class="btn-serious" style="background-color: #3b82f6;">Синяя</button>
+                    </div>
+                `;
+                // Надо нажать на красную кнопку с надписью "Зеленая"
+                document.getElementById('r9').onclick = next; 
+                document.getElementById('g9').onclick = fail;
+                document.getElementById('b9').onclick = fail;
+            },
+
+            // Уровень 10: Ловушка "Сохранить"
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4">Внимание! Обнаружена угроза. Форматировать диск?</div>
+                    <div class="flex flex-col gap-2 mt-4 items-center">
+                        <button id="f10" class="btn-serious !bg-red-800 w-48">Да, форматировать</button>
+                        <button id="n10" class="text-xs text-gray-700 opacity-10 hover:opacity-100 hover:text-gray-300 mt-8 transition-all duration-1000">Нет, отмена</button>
+                    </div>
+                `;
+                document.getElementById('f10').onclick = fail;
+                document.getElementById('n10').onclick = next;
+            },
+
+            // Уровень 11: Слепая зона
+            function() {
+                const c = document.getElementById('level-content');
+                // Текст написан черным по черному, его можно увидеть только выделив мышкой
+                c.innerHTML = `
+                    <div class="text-center mb-4">Введите защитный код:</div>
+                    <div class="w-32 h-10 bg-black border border-gray-800 mx-auto mt-2 text-black text-xs flex items-center justify-center select-all">8492</div>
+                    <input type="text" id="i11" class="terminal-input text-xl mt-6 pb-1 w-32" autocomplete="off">
+                    <button id="b11" class="btn-serious mt-6">Проверить</button>
+                `;
+                document.getElementById('b11').onclick = () => {
+                    if(document.getElementById('i11').value === '8492') next(); else fail();
+                };
+            },
+
+            // Уровень 12: Оценка
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-6">Оцените удобство портала:</div>
+                    <div class="flex gap-2 justify-center text-4xl mb-8">
+                        <span class="star cursor-pointer hover:text-yellow-500 transition-colors text-gray-700">★</span>
+                        <span class="star cursor-pointer hover:text-yellow-500 transition-colors text-gray-700">★</span>
+                        <span class="star cursor-pointer hover:text-yellow-500 transition-colors text-gray-700">★</span>
+                        <span class="star cursor-pointer hover:text-yellow-500 transition-colors text-gray-700">★</span>
+                        <span class="star cursor-pointer hover:text-yellow-500 transition-colors text-gray-700">★</span>
+                    </div>
+                `;
+                const stars = document.querySelectorAll('.star');
+                stars.forEach((s, idx) => {
+                    s.onclick = () => {
+                        // Токсичный разраб: 5 звезд - ошибка (слишком хорошо чтобы быть правдой). Пройти можно только поставив 1 звезду.
+                        if(idx === 0) next(); else fail();
+                    }
+                });
+            },
+
+            // Уровень 13: Тролльский дабл-клик
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-6">Дважды кликните для расшифровки ключа.</div>
+                    <button id="b13" class="btn-serious relative transition-transform">РАСШИФРОВАТЬ</button>
+                `;
+                let clicks = 0;
+                let b = document.getElementById('b13');
+                b.onclick = () => {
+                    clicks++;
+                    if(clicks === 1) {
+                        // После первого клика кнопка улетает в сторону на полсекунды
+                        b.style.transform = "translateX(80px)";
+                        setTimeout(() => { b.style.transform = "translateX(0px)"; clicks = 0; }, 400);
+                    } else if (clicks === 2) {
+                        next();
+                    }
+                };
+            },
+
+            // Уровень 14: Бесконечная загрузка
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-4">Синхронизация баз данных...</div>
+                    <div class="w-full bg-gray-800 h-2 mt-4 rounded overflow-hidden">
+                        <div id="bar14" class="bg-green-500 h-full w-0 shadow-[0_0_10px_#22c55e]"></div>
+                    </div>
+                    <div id="pct14" class="text-xs text-gray-500 mt-2 text-right w-full">0%</div>
+                    <button id="b14" class="btn-serious mt-4 absolute bottom-4 opacity-0 pointer-events-none scale-50 transition-all duration-75">Пропустить</button>
+                `;
+                let w = 0;
+                let b = document.getElementById('b14');
+                let bar = document.getElementById('bar14');
+                let pct = document.getElementById('pct14');
+                
+                let intId = setInterval(() => {
+                    w += (Math.random() * 2);
+                    if (w > 99.9) w = 99.9; // Зависает на 99.9%
+                    bar.style.width = w + '%';
+                    pct.innerText = w.toFixed(1) + '%';
+
+                    // Кнопка мелькает на долю секунды
+                    if (w > 95 && Math.random() < 0.1) {
+                        b.style.opacity = '1';
+                        b.style.pointerEvents = 'auto';
+                        b.style.transform = 'scale(1)';
+                        setTimeout(() => {
+                            b.style.opacity = '0';
+                            b.style.pointerEvents = 'none';
+                            b.style.transform = 'scale(0.5)';
+                        }, 150);
+                    }
+                }, 100);
+                globalIntervals.push(intId);
+
+                b.onclick = () => { clearInterval(intId); next(); };
+            },
+
+            // Уровень 15: Финальный Босс
+            function() {
+                const c = document.getElementById('level-content');
+                c.innerHTML = `
+                    <div class="text-center mb-6">Получение прав администратора.</div>
+                    <button id="b15" class="btn-serious w-full py-4 opacity-50 cursor-not-allowed" disabled>АВТОРИЗОВАТЬСЯ</button>
+                    <!-- Невидимый триггер в самом углу -->
+                    <div id="hack15" class="absolute top-0 right-0 w-4 h-4 cursor-crosshair opacity-0"></div>
+                `;
+                document.getElementById('hack15').onclick = () => {
+                    const b = document.getElementById('b15');
+                    b.disabled = false;
+                    b.classList.remove('opacity-50', 'cursor-not-allowed');
+                    b.classList.add('!bg-green-700', 'animate-pulse');
+                };
+                document.getElementById('b15').onclick = next;
+            }
+        ];
+
+        // Запуск
+        function renderLevel() {
+            clearLevel();
+            document.getElementById('step-counter').innerText = `ШАГ: ${stepLabels[currentLevel] || 'ERROR'} ИЗ 30`;
+            levels[currentLevel]();
+        }
+
+        // Инициализация первого уровня при загрузке
+        window.onload = renderLevel;
+
+    </script>
+</body>
+</html>
